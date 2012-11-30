@@ -9,6 +9,7 @@ import (
   "net/url"
   "strings"
   "log"
+  "sync"
 )
 
 // this file contains the interface to the couchdb server
@@ -82,12 +83,14 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
 // the cookie jar
 type cookieJar struct {
   couchCookie *http.Cookie
+  lk sync.Mutex
 }
 
 var EmptyCookie = http.Cookie{Name: "AuthSession", Value: ""}
 
-// TODO make it thread safe
 func (jar *cookieJar) SetCookies(url *url.URL, cookies []*http.Cookie) {
+  jar.lk.Lock()
+  defer jar.lk.Unlock()
   if len(cookies) == 0 {
     jar.couchCookie = &EmptyCookie
   } else {
@@ -99,8 +102,9 @@ func (jar *cookieJar) SetCookies(url *url.URL, cookies []*http.Cookie) {
   }
 }
 
-// TODO make it thread safe
 func (jar *cookieJar) Cookies(url *url.URL) []*http.Cookie {
+  jar.lk.Lock()
+  defer jar.lk.Unlock()
   return []*http.Cookie{jar.couchCookie}
 }
 
@@ -109,7 +113,7 @@ func (couch *CouchDB) StartSession() CouchSession {
   // add my personal cookie jar for this session
   // copy the underlying couch client
   my_couch := *couch
-  my_couch.client.Jar = &cookieJar{&EmptyCookie}
+  my_couch.client.Jar = &cookieJar{&EmptyCookie, sync.Mutex{}}
   return CouchSession { &my_couch, "" }
 }
 
