@@ -81,21 +81,27 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
 
 // the cookie jar
 type cookieJar struct {
-  couchCookie http.Cookie
+  couchCookie *http.Cookie
 }
+
+var EmptyCookie = http.Cookie{Name: "AuthSession", Value: ""}
 
 // TODO make it thread safe
 func (jar *cookieJar) SetCookies(url *url.URL, cookies []*http.Cookie) {
-  for i := range cookies {
-    if cookies[i].Name == "AuthSession" {
-      jar.couchCookie = *cookies[i]
+  if len(cookies) == 0 {
+    jar.couchCookie = &EmptyCookie
+  } else {
+    for i := range cookies {
+      if cookies[i].Name == "AuthSession" {
+        jar.couchCookie = cookies[i]
+      }
     }
   }
 }
 
 // TODO make it thread safe
 func (jar *cookieJar) Cookies(url *url.URL) []*http.Cookie {
-  return []*http.Cookie{&jar.couchCookie}
+  return []*http.Cookie{jar.couchCookie}
 }
 
 // start a new session for this couchdb instance
@@ -103,7 +109,7 @@ func (couch *CouchDB) StartSession() CouchSession {
   // add my personal cookie jar for this session
   // copy the underlying couch client
   my_couch := *couch
-  my_couch.client.Jar = &cookieJar{http.Cookie{}}
+  my_couch.client.Jar = &cookieJar{&EmptyCookie}
   return CouchSession { &my_couch, "" }
 }
 
