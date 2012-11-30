@@ -196,8 +196,29 @@ func (couch CouchDB) GetDatabase(name string) Database {
   return Database { name, couch }
 }
 
-func (d Database) SaveDesign(design Design) (string, string, error) {
-  return "", "", nil
+// returns the database url
+func (db Database) GetUrl() string {
+  return db.couch.url() + db.Name
+}
+
+// creates the database. returns true iff the database was actually created, not if it already existed
+func (db Database) Create() bool {
+  var resp simpleResult
+  err := db.couch.doJsonRequest("POST", db.GetUrl(), nil, false, &resp)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return false
+  }
+  return resp.Ok
+}
+
+// save the document into the database. if it is successfully saved, then the revision is modified in place
+func (db Database) SaveDoc(doc *IdRev) *CouchError {
+  return &CouchError{}
+}
+
+func (db Database) SaveDesign(design *Design) *CouchError {
+  return &CouchError{}
 }
 
 // ========== Designs and Views ==========
@@ -223,15 +244,20 @@ type simpleResult struct {
   Rev *string `json:"rev,omitempty"`
 }
 
-type errorResult struct {
-  Error *string `json:"error"`
-  Reason *string `json:"reason"`
-}
-
 type loginResult struct {
   Ok bool `json:"ok"`
   Name *string `json:"name"`
   Roles []string `json:"roles"`
 }
 
-func getIdAndRev(doc interface{})
+// ========== Some Userful Types ==========
+
+type CouchError struct {
+  Error *string `json:"error"`
+  Reason *string `json:"reason"`
+}
+
+type IdRev struct {
+  Id string `json:"_id"`
+  Rev *string `json:"_rev,omitempty"`
+}
