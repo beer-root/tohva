@@ -3,3 +3,6 @@ depends:
 
 all: depends
 	go build tohva.go
+
+tests: all
+	go test
