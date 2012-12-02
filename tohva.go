@@ -1,9 +1,9 @@
 package tohva
 
 import (
-  "fmt"
   "io"
   "io/ioutil"
+  "fmt"
   "encoding/json"
   "strconv"
   "net/http"
@@ -46,7 +46,7 @@ func CreateCouchClient(host string, port int) CouchDB {
 func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, form bool, result interface{}) error {
   req, err := couch.newRequest(method, path, body)
   if err != nil {
-    return CouchError {"Unable to issue the request", err.Error()}
+    return err
   }
   // set the accept header
   req.Header.Add("Accept", "application/json")
@@ -63,7 +63,7 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   // send the request
   resp, err := couch.client.Do(req)
   if err != nil {
-    return CouchError {"Something wrong happened sending the request", err.Error()}
+    return err
   } else if err == nil && couch.client.Jar != nil {
 		couch.client.Jar.SetCookies(req.URL, resp.Cookies())
 	}
@@ -74,27 +74,25 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   defer resp.Body.Close()
   respData, err := ioutil.ReadAll(resp.Body)
   if err != nil {
-    return CouchError {"Unable to read the response", err.Error()}
+    return err
   }
   // parse the result
   if resp.StatusCode / 200 == 1 {
     // status code is 2XX -> ok
     err = json.Unmarshal(respData, result)
     if err != nil {
-      return CouchError {"Unable to convert the response to the expected type", err.Error()}
+      return err
     }
     return nil
   }
 
   var couchErr CouchError
+  couchErr.StatusCode = resp.StatusCode
 
   err = json.Unmarshal(respData, &couchErr)
 
   if err != nil {
-    return CouchError {
-      "Something wrong happened with the request",
-      fmt.Sprintf("The server answered status code %d to the %s request sent to $s",
-        resp.StatusCode, method, path)}
+    return err
   }
 
   return couchErr
@@ -217,6 +215,12 @@ func (db Database) GetUrl() string {
   return db.couch.url() + db.Name
 }
 
+// checks whether the database exists in the couchdb instance
+func (db Database) Exists() bool {
+  return true
+}
+
+
 // creates the database. returns true iff the database was actually created, not if it already existed
 func (db Database) Create() bool {
   var resp simpleResult
@@ -281,10 +285,11 @@ type loginResult struct {
 type CouchError struct {
   Msg string `json:"error"`
   Reason string `json:"reason"`
+  StatusCode int
 }
 
 func (err CouchError) Error() string {
-  return err.Msg + " -> " + err.Reason
+  return fmt.Sprintf("%d: %s caused by %s", err.StatusCode, err.Msg, err.Reason)
 }
 
 type IdRev struct {
