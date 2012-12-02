@@ -1,6 +1,7 @@
 package tohva
 
 import (
+  "fmt"
   "io"
   "io/ioutil"
   "encoding/json"
@@ -45,7 +46,7 @@ func CreateCouchClient(host string, port int) CouchDB {
 func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, form bool, result interface{}) error {
   req, err := couch.newRequest(method, path, body)
   if err != nil {
-    return err
+    return CouchError {"Unable to issue the request", err.Error()}
   }
   // set the accept header
   req.Header.Add("Accept", "application/json")
@@ -62,7 +63,7 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   // send the request
   resp, err := couch.client.Do(req)
   if err != nil {
-    return err
+    return CouchError {"Something wrong happened sending the request", err.Error()}
   } else if err == nil && couch.client.Jar != nil {
 		couch.client.Jar.SetCookies(req.URL, resp.Cookies())
 	}
@@ -71,13 +72,32 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
     defer req.Body.Close()
   }
   defer resp.Body.Close()
-  // parse the result
   respData, err := ioutil.ReadAll(resp.Body)
   if err != nil {
-    return err
+    return CouchError {"Unable to read the response", err.Error()}
   }
-  err = json.Unmarshal(respData, result)
-  return err
+  // parse the result
+  if resp.StatusCode / 200 == 1 {
+    // status code is 2XX -> ok
+    err = json.Unmarshal(respData, result)
+    if err != nil {
+      return CouchError {"Unable to convert the response to the expected type", err.Error()}
+    }
+    return nil
+  }
+
+  var couchErr CouchError
+
+  err = json.Unmarshal(respData, &couchErr)
+
+  if err != nil {
+    return CouchError {
+      "Something wrong happened with the request",
+      fmt.Sprintf("The server answered status code %d to the %s request sent to $s",
+        resp.StatusCode, method, path)}
+  }
+
+  return couchErr
 }
 
 // the cookie jar
@@ -91,13 +111,9 @@ var EmptyCookie = http.Cookie{Name: "AuthSession", Value: ""}
 func (jar *cookieJar) SetCookies(url *url.URL, cookies []*http.Cookie) {
   jar.lk.Lock()
   defer jar.lk.Unlock()
-  if len(cookies) == 0 {
-    jar.couchCookie = &EmptyCookie
-  } else {
-    for i := range cookies {
-      if cookies[i].Name == "AuthSession" {
-        jar.couchCookie = cookies[i]
-      }
+  for i := range cookies {
+    if cookies[i].Name == "AuthSession" {
+      jar.couchCookie = cookies[i]
     }
   }
 }
@@ -204,7 +220,17 @@ func (db Database) GetUrl() string {
 // creates the database. returns true iff the database was actually created, not if it already existed
 func (db Database) Create() bool {
   var resp simpleResult
-  err := db.couch.doJsonRequest("POST", db.GetUrl(), nil, false, &resp)
+  err := db.couch.doJsonRequest("PUT", db.Name, nil, false, &resp)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return false
+  }
+  return resp.Ok
+}
+
+func (db Database) Delete() bool {
+  var resp simpleResult
+  err := db.couch.doJsonRequest("DELETE", db.Name, nil, false, &resp)
   if err != nil {
     log.Println("[ERROR]", err)
     return false
@@ -253,8 +279,12 @@ type loginResult struct {
 // ========== Some Userful Types ==========
 
 type CouchError struct {
-  Error *string `json:"error"`
-  Reason *string `json:"reason"`
+  Msg string `json:"error"`
+  Reason string `json:"reason"`
+}
+
+func (err CouchError) Error() string {
+  return err.Msg + " -> " + err.Reason
 }
 
 type IdRev struct {
