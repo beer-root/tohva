@@ -15,6 +15,10 @@ func TestCreateDatabase(t *testing.T) {
 
   db := session.GetDatabase("tohva_test")
 
+  if db.Exists() {
+    db.Delete()
+  }
+
   if !db.Create() {
     t.Error("pffffff! you didn't clean the couchdb instance fuckin' bastard")
   } else {

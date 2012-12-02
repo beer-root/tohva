@@ -1,6 +1,7 @@
 package tohva
 
 import (
+  "bytes"
   "io"
   "io/ioutil"
   "fmt"
@@ -277,8 +278,25 @@ func (db Database) Delete() bool {
 }
 
 // save the document into the database. if it is successfully saved, then the revision is modified in place
-func (db Database) SaveDoc(doc *IdRev) *CouchError {
-  return &CouchError{}
+func (db Database) SaveDoc(doc IdRev) error {
+  var resp simpleResult
+  body, err := json.Marshal(doc)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+  err = db.couch.doJsonRequest("PUT", db.Name + "/" + doc.GetId(), bytes.NewReader(body), false, &resp)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+
+  // save new revision in place
+  if resp.Ok {
+    doc.SetRev(*resp.Rev)
+  }
+
+  return nil
 }
 
 func (db Database) SaveDesign(design *Design) *CouchError {
@@ -340,7 +358,25 @@ type DbInfo struct {
   CommittedUpdateSeq int64 `json:"committed_update_seq"`
 }
 
-type IdRev struct {
+type WithIdRev struct {
   Id string `json:"_id"`
   Rev *string `json:"_rev,omitempty"`
+}
+
+func (idRev *WithIdRev) GetId() string {
+  return idRev.Id
+}
+
+func (idRev *WithIdRev) GetRev() *string {
+  return idRev.Rev
+}
+
+func (idRev *WithIdRev) SetRev(rev string) {
+  idRev.Rev = &rev
+}
+
+type IdRev interface {
+  GetId() string
+  GetRev() *string
+  SetRev(rev string)
 }
