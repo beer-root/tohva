@@ -235,6 +235,19 @@ func (db Database) Exists() bool {
   return true
 }
 
+// returns the database informations if it exists, or nil if not
+func (db Database) GetInfo() *DbInfo {
+  if db.Exists() {
+    var result DbInfo
+    err := db.couch.doJsonRequest("GET", db.Name, nil, false, &result)
+    if err != nil {
+      log.Println("[ERROR]", err)
+      return nil
+    }
+    return &result
+  }
+  return nil
+}
 
 // creates the database. returns true iff the database was actually created, not if it already existed
 func (db Database) Create() bool {
