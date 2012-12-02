@@ -68,7 +68,7 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
 		couch.client.Jar.SetCookies(req.URL, resp.Cookies())
 	}
   // don't forget to close the bodies
-  if body != nil {
+  if req.Body != nil {
     defer req.Body.Close()
   }
   defer resp.Body.Close()
@@ -79,9 +79,11 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   // parse the result
   if resp.StatusCode / 200 == 1 {
     // status code is 2XX -> ok
-    err = json.Unmarshal(respData, result)
-    if err != nil {
-      return err
+    if len(respData) > 0 && result != nil {
+      err = json.Unmarshal(respData, result)
+      if err != nil {
+        return err
+      }
     }
     return nil
   }
@@ -89,10 +91,11 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   var couchErr CouchError
   couchErr.StatusCode = resp.StatusCode
 
-  err = json.Unmarshal(respData, &couchErr)
-
-  if err != nil {
-    return err
+  if len(respData) > 0 {
+    err = json.Unmarshal(respData, &couchErr)
+    if err != nil {
+      return err
+    }
   }
 
   return couchErr
@@ -217,29 +220,47 @@ func (db Database) GetUrl() string {
 
 // checks whether the database exists in the couchdb instance
 func (db Database) Exists() bool {
+  err := db.couch.doJsonRequest("HEAD", db.Name, nil, false, nil)
+  if err != nil {
+    switch err.(type) {
+    case CouchError:
+      if err.(CouchError).StatusCode != 404 {
+        log.Println("[ERROR]", err)
+      }
+    default:
+      log.Println("[ERROR]", err)
+    }
+    return false
+  }
   return true
 }
 
 
 // creates the database. returns true iff the database was actually created, not if it already existed
 func (db Database) Create() bool {
-  var resp simpleResult
-  err := db.couch.doJsonRequest("PUT", db.Name, nil, false, &resp)
-  if err != nil {
-    log.Println("[ERROR]", err)
-    return false
+  if !db.Exists() {
+    var resp simpleResult
+    err := db.couch.doJsonRequest("PUT", db.Name, nil, false, &resp)
+    if err != nil {
+      log.Println("[ERROR]", err)
+      return false
+    }
+    return resp.Ok
   }
-  return resp.Ok
+  return false
 }
 
 func (db Database) Delete() bool {
-  var resp simpleResult
-  err := db.couch.doJsonRequest("DELETE", db.Name, nil, false, &resp)
-  if err != nil {
-    log.Println("[ERROR]", err)
-    return false
+  if db.Exists() {
+    var resp simpleResult
+    err := db.couch.doJsonRequest("DELETE", db.Name, nil, false, &resp)
+    if err != nil {
+      log.Println("[ERROR]", err)
+      return false
+    }
+    return resp.Ok
   }
-  return resp.Ok
+  return false
 }
 
 // save the document into the database. if it is successfully saved, then the revision is modified in place
@@ -290,6 +311,20 @@ type CouchError struct {
 
 func (err CouchError) Error() string {
   return fmt.Sprintf("%d: %s caused by %s", err.StatusCode, err.Msg, err.Reason)
+}
+
+type DbInfo struct {
+  Name string `json:"db_name"`
+  DocCount int64 `json:"doc_count"`
+  DocDelCount int64 `json:"doc_del_count"`
+  UpdateSeq int64 `json:"update_seq"`
+  PurgeSeq int64 `json:"purge_seq"`
+  CompactRunning bool `json:"compact_running"`
+  DiskSize int64 `json:"disk_size"`
+  DataSize int64 `json:"data_size"`
+  InstanceStartTime string `json:"instance_start_time"`
+  DiskFormatVersion int64 `json:"disk_format_version"`
+  CommittedUpdateSeq int64 `json:"committed_update_seq"`
 }
 
 type IdRev struct {

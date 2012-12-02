@@ -1,6 +1,9 @@
 package tohva
 
-import "testing"
+import (
+  "testing"
+  "log"
+)
 
 // in these tests we assume again that there exists a user named `admin` with password `admin`
 // who is database administrator
@@ -16,6 +19,6 @@ func TestCreateDatabase(t * testing.T) {
     t.Error("pffffff! you didn't clean the couchdb instance fuckin' bastard")
   } else {
     // cleaning
-    db.Delete()
+    log.Println(db.Delete())
   }
 }
