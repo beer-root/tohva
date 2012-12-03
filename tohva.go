@@ -54,6 +54,7 @@ func (couch *CouchDB) doJsonRequest(method string, path string, body io.Reader, 
   // url encoded form submission
   if form {
     req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+    // TODO is the next line really needed?
     req.Header.Add("Referer", "http://localhost:5984")
   }
 	if couch.client.Jar != nil {
@@ -299,8 +300,49 @@ func (db Database) SaveDoc(doc IdRev) error {
   return nil
 }
 
-func (db Database) SaveDesign(design *Design) *CouchError {
-  return &CouchError{}
+// returns the document revision if it exists in the couchdb instance
+func (db Database) GetDocRev(id string) *string {
+  req, err := db.couch.newRequest("HEAD", db.Name + "/" + id, nil)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return nil
+  }
+	if db.couch.client.Jar != nil {
+		for _, cookie := range db.couch.client.Jar.Cookies(req.URL) {
+			req.AddCookie(cookie)
+		}
+	}
+  // send the request
+  resp, err := db.couch.client.Do(req)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return nil
+  } else if err == nil && db.couch.client.Jar != nil {
+		db.couch.client.Jar.SetCookies(req.URL, resp.Cookies())
+	}
+  // don't forget to close the bodies
+  if req.Body != nil {
+    defer req.Body.Close()
+  }
+  defer resp.Body.Close()
+
+  // the Etag header contains the revision
+  etag := resp.Header["Etag"]
+  if len(etag) > 0 {
+    return &etag[0]
+  }
+
+  return nil
+}
+
+func (db Database) GetDoc(id string, doc *IdRev) error {
+  // TODO implement
+  return CouchError{}
+}
+
+func (db Database) SaveDesign(design *Design) error {
+  // TODO implement
+  return CouchError{}
 }
 
 // ========== Designs and Views ==========
