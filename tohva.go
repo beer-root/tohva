@@ -345,8 +345,35 @@ func (db Database) GetDoc(id string, doc interface{}) error {
 }
 
 func (db Database) SaveDesign(design *Design) error {
-  // TODO implement
-  return CouchError{}
+  var resp simpleResult
+  body, err := json.Marshal(design)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+  err = db.couch.doJsonRequest("PUT", db.Name + "/_design/" + design.Id, bytes.NewReader(body), false, &resp)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+
+  // save new revision in place
+  if resp.Ok {
+    design.Rev = *resp.Rev
+  }
+
+  return nil
+}
+
+func (db Database) QueryView(design string, view string) error {
+  // TODO add all parameters
+  var resp QueryResult
+  err := db.couch.doJsonRequest("GET", db.Name + "/_design/" + design + "/_view/" + view, nil, false, &resp)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+  return nil
 }
 
 // ========== Designs and Views ==========
@@ -362,6 +389,9 @@ type Design struct {
 type View struct {
   Map string `json:"map"`
   Reduce string `json:"map,omitempty"`
+}
+
+type QueryResult struct {
 }
 
 // ========== Internals ==========
