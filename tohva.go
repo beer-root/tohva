@@ -345,7 +345,6 @@ func (db Database) GetDoc(id string, doc interface{}) error {
 }
 
 func (db Database) SaveDesign(design *Design) error {
-  // TODO implement
   return CouchError{}
 }
 
