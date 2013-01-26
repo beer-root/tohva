@@ -3,13 +3,13 @@ package tohva
 import "testing"
 
 func TestGetSessionInfo(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   t.Log(session.GetSessionInfo())
 }
 
 func TestLogin(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   if !session.Login("admin", "admin") {
     t.Error("wrong admin credentials")
@@ -20,7 +20,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestIsLoggedIn(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   if session.IsLoggedIn() {
     t.Error("w00t?? how is that even possible")
@@ -34,7 +34,7 @@ func TestIsLoggedIn(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   if session.IsLoggedIn() {
     t.Error("w00t?? how is that even possible")

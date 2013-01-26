@@ -9,7 +9,7 @@ import (
 // who is database administrator
 
 func TestCreateDatabase(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   session.Login("admin", "admin")
 
@@ -28,7 +28,7 @@ func TestCreateDatabase(t *testing.T) {
 }
 
 func TestGetInfo(t *testing.T) {
-  couch := CreateCouchClient("localhost", 5984)
+  couch := CreateCouchClient(TestCouchHost, 5984)
   session := couch.StartSession()
   session.Login("admin", "admin")
 
