@@ -335,8 +335,8 @@ func (db Database) GetDocRev(id string) *string {
   return nil
 }
 
-func (db Database) GetDoc(id string, doc *IdRev) error {
-  err = db.couch.doJsonRequest("GET", db.Name + "/" + doc.GetId(), nil, false, doc)
+func (db Database) GetDoc(id string, doc interface{}) error {
+  err := db.couch.doJsonRequest("GET", db.Name + "/" + id, nil, false, doc)
   if err != nil {
     log.Println("[ERROR]", err)
     return err
