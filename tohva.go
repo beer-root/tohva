@@ -336,8 +336,12 @@ func (db Database) GetDocRev(id string) *string {
 }
 
 func (db Database) GetDoc(id string, doc *IdRev) error {
-  // TODO implement
-  return CouchError{}
+  err = db.couch.doJsonRequest("GET", db.Name + "/" + doc.GetId(), nil, false, doc)
+  if err != nil {
+    log.Println("[ERROR]", err)
+    return err
+  }
+  return nil
 }
 
 func (db Database) SaveDesign(design *Design) error {
